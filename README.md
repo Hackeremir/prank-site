@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Top Secret Terminal</title>
+<style>
+  :root{
+    --bg:#01040a;
+    --text:#33ff77;
+    --muted: #7ddfa3;
+  }
+  html,body{
+    height:100%;
+    margin:0;
+    background: radial-gradient(ellipse at center, #001018 0%, var(--bg) 60%);
+    font-family: "Consolas", "Courier New", monospace;
+    color:var(--text);
+  }
+  .screen{
+    box-sizing:border-box;
+    width:100%;
+    height:100%;
+    padding:28px;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+  }
+  .header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    color:var(--muted);
+    font-size:14px;
+  }
+  .term{
+    background: rgba(0,0,0,0.45);
+    border: 1px solid rgba(100,255,170,0.06);
+    border-radius:8px;
+    flex:1;
+    padding:16px;
+    overflow:hidden;
+    position:relative;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.02);
+  }
+  .output{
+    white-space:pre-wrap;
+    line-height:1.28;
+    font-size:14px;
+    height:100%;
+    overflow:auto;
+    padding-right:8px;
+  }
+  .cursor{
+    display:inline-block;
+    width:10px;
+    height:18px;
+    background:var(--text);
+    margin-left:3px;
+    vertical-align:middle;
+    animation: blink 0.8s steps(2) infinite;
+  }
+  @keyframes blink{50%{opacity:0}}
+  .progress-wrap{
+    margin-top:8px;
+    display:flex;
+    gap:8px;
+    align-items:center;
+  }
+  .bar{
+    height:10px;
+    background: rgba(255,255,255,0.06);
+    border-radius:6px;
+    overflow:hidden;
+    flex:1;
+  }
+  .bar > i{
+    display:block;
+    height:100%;
+    width:0%;
+    background: linear-gradient(90deg, rgba(51,255,119,0.12), rgba(51,255,119,0.35));
+    transition: width 300ms linear;
+  }
+  .big-alert{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    pointer-events:none;
+    opacity:0;
+    transform:scale(0.9);
+    transition: all 400ms cubic-bezier(.2,.9,.2,1);
+  }
+  .big-alert.show{
+    pointer-events:auto;
+    opacity:1;
+    transform:scale(1);
+  }
+  .big-alert .card{
+    background: rgba(0,0,0,0.75);
+    border-radius:12px;
+    border: 2px solid rgba(255,0,0,0.12);
+    padding:28px 36px;
+    text-align:center;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+  }
+  .big-alert h1{
+    margin:0 0 8px 0;
+    font-size:48px;
+    color:#ff3b3b;
+    letter-spacing:2px;
+    text-shadow:0 2px 12px rgba(0,0,0,0.7);
+  }
+  .big-alert p{ margin:0; color:#fff; opacity:0.9; font-size:16px; }
+  .controls{ display:flex; gap:10px; align-items:center; }
+  .btn{
+    background:transparent;
+    border:1px solid rgba(255,255,255,0.06);
+    color:var(--muted);
+    padding:8px 12px;
+    border-radius:8px;
+    cursor:pointer;
+    font-family:inherit;
+    font-size:13px;
+  }
+  .btn.positive{
+    border-color: rgba(51,255,119,0.18);
+    color:var(--text);
+  }
+  footer{
+    text-align:right;
+    color:rgba(125,223,163,0.6);
+    font-size:12px;
+  }
+
+  /* small screens */
+  @media (max-width:520px){
+    .big-alert h1{ font-size:36px }
+    .big-alert .card{ padding:18px 20px }
+  }
+</style>
+</head>
+<body>
+  <div class="screen">
+    <div class="header">
+      <div>TopSecret OS &nbsp;|&nbsp; Terminal Emulator</div>
+      <div class="controls">
+        <button id="restart" class="btn">Yeniden Başlat</button>
+        <button id="clean" class="btn positive">Temizle</button>
+      </div>
+    </div>
+
+    <div class="term" role="log" aria-live="polite">
+      <div id="output" class="output"></div>
+
+      <div class="big-alert" id="alert">
+        <div class="card">
+          <h1>HACKED</h1>
+          <p>Bu sadece bir şaka — zarar yok. 😅</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="progress-wrap" aria-hidden="true">
+      <div style="width:160px; font-size:12px; color:rgba(125,223,163,0.7)">Bağlantı: 127.0.0.1</div>
+      <div class="bar" aria-hidden="true"><i id="barInner"></i></div>
+    </div>
+    <footer>Bu bir gösteridir — gerçek saldırı değildir.</footer>
+  </div>
+
+<script>
+(function(){
+  const output = document.getElementById('output');
+  const alertBox = document.getElementById('alert');
+  const barInner = document.getElementById('barInner');
+  const restartBtn = document.getElementById('restart');
+  const cleanBtn = document.getElementById('clean');
+
+  const lines = [
+    "Initializing connection to target...",
+    "Resolving DNS... 127.0.0.1",
+    "Establishing encrypted channel [TLS 1.3]...",
+    "Bypassing firewall rules (simulated)...",
+    "Enumerating services: ssh, http, db, ftp",
+    "Downloading leaked-credentials.db (simulated)...",
+    "Cracking weak passwords: 3 of 512 tested",
+    "Gaining persistence via startup entry (simulation)",
+    "Injecting shellcode into process 0x4b1 (simulated)",
+    "Extracting secrets...",
+    "Uploading archive to remote sink (simulated)...",
+    "Clearing traces (simulation)",
+    "Finalizing..."
+  ];
+
+  const filler = [
+    "0x4f8a: mov eax, ebx",
+    "0x4f8b: xor rsi, rsi",
+    "0x4f8c: jmp 0x401000",
+    "daemon: listening on 0.0.0.0:22",
+    "user@mail:~$ cat /etc/passwd | grep admin",
+    "root@node:~# ls -la /var/lib/secret",
+    ">>> reading memory chunk 0x3ff8a...",
+    ">>> entropy: 0.9924",
+    "packet 0x1a2b: SYN",
+    "packet 0x1a2c: ACK",
+    "tcp 127.0.0.1:443 -> 10.0.0.5:52312"
+  ];
+
+  function randFrom(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+  function typeLine(line, speed=8){
+    return new Promise(resolve=>{
+      let i=0;
+      const span = document.createElement('span');
+      output.appendChild(span);
+      const cursor = document.createElement('span');
+      cursor.className='cursor';
+      span.appendChild(document.createTextNode(''));
+      span.appendChild(cursor);
+
+      function step(){
+        if(i < line.length){
+          // insert next char before cursor
+          span.insertBefore(document.createTextNode(line[i]), cursor);
+          i++;
+          output.scrollTop = output.scrollHeight;
+          setTimeout(step, 10 + Math.random()*speed*10);
+        } else {
+          // remove cursor and newline
+          span.removeChild(cursor);
+          output.appendChild(document.createTextNode("\n"));
+          output.scrollTop = output.scrollHeight;
+          resolve();
+        }
+      }
+      step();
+    });
+  }
+
+  async function runSequence(){
+    output.textContent = "";
+    barInner.style.width = "0%";
+    alertBox.classList.remove('show');
+
+    // header lines
+    await typeLine(">>> SYSTEM BOOT (simulated)");
+    await sleep(300);
+    await typeLine(">>> SECURE CHANNEL OPENED");
+    await sleep(300);
+
+    // main lines with intermittent filler
+    for(let i=0;i<lines.length;i++){
+      await typeLine("> " + lines[i]);
+      // add some filler lines randomly
+      if(Math.random() > 0.4){
+        const fcount = 1 + Math.floor(Math.random()*2);
+        for(let j=0;j<fcount;j++){
+          await typeLine("  " + randFrom(filler));
+        }
+      }
+      // animate progress bar a bit
+      const pct = Math.floor(((i+1)/lines.length) * 95);
+      barInner.style.width = pct + "%";
+      await sleep(180 + Math.random()*300);
+    }
+
+    // final progress
+    for(let p=95;p<=100;p++){
+      barInner.style.width = p + "%";
+      await sleep(80 + Math.random()*80);
+    }
+
+    // dramatic pause
+    await sleep(600);
+    // flood with matrix-ish lines
+    for(let k=0;k<8;k++){
+      await typeLine(randFrom(filler) + " | " + randomHex(48));
+      await sleep(40);
+    }
+
+    // big reveal
+    alertBox.classList.add('show');
+    await typeLine("\n*** TARGET COMPROMISED (simulated) ***");
+    await typeLine("YOU HAVE BEEN HACKED (just kidding) — şaka bitti.");
+  }
+
+  function randomHex(len){
+    const hex = "0123456789abcdef";
+    let s="";
+    for(let i=0;i<len;i++) s += hex[Math.floor(Math.random()*hex.length)];
+    return s;
+  }
+
+  function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+  restartBtn.addEventListener('click', runSequence);
+  cleanBtn.addEventListener('click', ()=>{
+    output.textContent = "";
+    barInner.style.width = "0%";
+    alertBox.classList.remove('show');
+  });
+
+  // kick off automatically when page opens
+  runSequence();
+
+})();
+</script>
+</body>
+</html>
